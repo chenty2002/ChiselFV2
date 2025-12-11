@@ -2,6 +2,7 @@ package chiselFv
 
 import chisel3.experimental.SourceInfo
 import chisel3._
+import chisel3.ltl.{AssertProperty, Sequence}
 
 
 trait Formal {
@@ -17,7 +18,7 @@ trait Formal {
   def fvAssert(cond: Bool, msg: String = "")
               (implicit sourceInfo: SourceInfo): Unit = {
     when(notChaos) {
-      assert(cond, msg)
+      AssertProperty(cond, msg)
     }
   }
 
@@ -80,6 +81,23 @@ trait Formal {
   def anyconst(w: Int): UInt = {
     val cst = Module(new AnyConst(w))
     cst.io.out
+  }
+
+  def astLiveness(req: Bool, resp: Bool, msg: String = "")(implicit sourceInfo: SourceInfo): Unit = {
+    val reqProp: Sequence = req
+    val respProp: Sequence = resp
+    when(notChaos) {
+      AssertProperty(reqProp |-> respProp.eventually, label = Option(msg))
+    }
+  }
+
+  def astRelaxedLiveness(req: Bool, resp: Bool, n: Int, msg: String = "")
+                        (implicit sourceInfo: SourceInfo): Unit = {
+    val reqProp: Sequence = req
+    val respProp: Sequence = resp
+    when(notChaos) {
+      AssertProperty(reqProp |-> respProp.delayRange(1, n), label = Option(msg))
+    }
   }
 
   def assertLivenessTimer(cond: Bool, reset: Bool, n: Int, msg: String = "")
