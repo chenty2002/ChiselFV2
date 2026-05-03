@@ -5,13 +5,14 @@ ThisBuild / version          := "0.1.0"
 ThisBuild / organization     := "chenty"
 
 val chiselVersion = "3.6.0"
+val scalaTestVersion = "3.2.18"
 
 lazy val root = (project in file("."))
   .settings(
     name := "ChiselFV",
     libraryDependencies ++= Seq(
       "edu.berkeley.cs" %% "chisel3" % chiselVersion,
-      "edu.berkeley.cs" %% "chiseltest" % "0.6.2" % "test"
+      "org.scalatest" %% "scalatest" % scalaTestVersion % Test
     ),
     scalacOptions ++= Seq(
       "-language:reflectiveCalls",
@@ -21,5 +22,5 @@ lazy val root = (project in file("."))
       "-P:chiselplugin:genBundleElements",
     ),
     addCompilerPlugin("edu.berkeley.cs" % "chisel3-plugin" % chiselVersion cross CrossVersion.full),
+    Test / parallelExecution := false,
   )
-
