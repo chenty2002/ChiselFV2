@@ -1,7 +1,7 @@
 package chiselFv
 
 import chisel3._
-import chisel3.stage.ChiselStage
+import circt.stage.ChiselStage
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -9,10 +9,7 @@ class FullTest extends AnyFlatSpec with Matchers {
   behavior of "Formal"
 
   it should "elaborate every public assertion helper" in {
-    val sv = (new ChiselStage).emitVerilog(
-      new FullTestDut,
-      Array("--target-dir", "target/full-test")
-    )
+    val sv = ChiselStage.emitSystemVerilog(new FullTestDut)
 
     sv should include("module FullTestDut")
     sv should include("assert")

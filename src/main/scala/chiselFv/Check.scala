@@ -7,7 +7,6 @@ import circt.stage.ChiselStage
 import java.io.{File, PrintWriter}
 import java.nio.file.Paths
 import scala.io.Source
-import scala.collection.mutable.ArrayBuffer
 import scala.util.control.Breaks._
 
 object Check {
@@ -152,9 +151,11 @@ object Check {
   def generateRTL[T <: RawModule] (dutGen: () => T, targetDirSufix: String = "_build", outputFile: String = "") = {
     val name = modName(dutGen)
     val targetDir = name + targetDirSufix
-    val arg = new ArrayBuffer[String]
-    arg ++= Array("--target-dir", targetDir)
-    val rtl = ChiselStage.emitSystemVerilog(dutGen(), arg.toArray)
+    val target = new File(targetDir)
+    if (!target.exists()) {
+      target.mkdirs()
+    }
+    val rtl = ChiselStage.emitSystemVerilog(dutGen())
 
     val suffix = "sv"
     val currentPath = Paths.get(System.getProperty("user.dir"))
@@ -172,8 +173,8 @@ object Check {
 
   private def processResultHandler(process: Process, name: String, dir: String): Unit = {
 
-    val output = Source.fromInputStream(process.getInputStream).getLines.mkString("\n")
-    val error = Source.fromInputStream(process.getErrorStream).getLines.mkString("\n")
+    val output = Source.fromInputStream(process.getInputStream).getLines().mkString("\n")
+    val error = Source.fromInputStream(process.getErrorStream).getLines().mkString("\n")
 
     if (error != "") {
       println("Error: " + error)

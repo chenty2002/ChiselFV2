@@ -2,6 +2,7 @@ package chiselFv
 
 import chisel3.experimental.SourceInfo
 import chisel3._
+import chisel3.ltl.AssertProperty
 import chisel3.util.Cat
 import chisel3.util.log2Ceil
 
@@ -71,14 +72,14 @@ trait Formal {
   def fvAssert(cond: Bool, msg: String = "")
               (implicit sourceInfo: SourceInfo): Unit = {
     when(notChaos) {
-      assert(cond, msg)
+      AssertProperty(cond, msg)
     }
   }
 
   def assertAt(n: UInt, cond: Bool, msg: String = "")
               (implicit sourceInfo: SourceInfo): Unit = {
-    when(notChaos && timeSinceReset === n) {
-      assert(cond, msg)
+    when(timeSinceReset === n) {
+      fvAssert(cond, msg)
     }
   }
 
