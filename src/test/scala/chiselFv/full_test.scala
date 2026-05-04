@@ -5,17 +5,55 @@ import chisel3.stage.ChiselStage
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
+import java.util.regex.Pattern
+import scala.annotation.nowarn
+
 class FullTest extends AnyFlatSpec with Matchers {
   behavior of "Formal"
 
-  it should "elaborate every public assertion helper" in {
-    val sv = (new ChiselStage).emitVerilog(
-      new FullTestDut,
-      Array("--target-dir", "target/full-test")
-    )
+  it should "emit and verify every public assertion helper" in {
+    val sv = emitVerilog()
+    val out = Path.of("verilog", "FullTestDut.v")
+    Files.createDirectories(out.getParent)
+    Files.writeString(out, sv, StandardCharsets.UTF_8)
 
     sv should include("module FullTestDut")
-    sv should include("assert")
+    assertionMessages.foreach { message =>
+      sv should include(s"Assertion failed: $message")
+    }
+    sv should include("nextTimer <= 7'h40")
+    sv should include("nextTimer_1 <= 3'h4")
+    sv should include("nextTimer_2 <= 3'h4")
+    sv should include("nextTimer_3 <= 3'h4")
+    countOccurrences(sv, "$fatal") shouldBe assertionMessages.size
+    countOccurrences(sv, "assert property") shouldBe 0
+  }
+
+  private val assertionMessages = Seq(
+    "fvAssert",
+    "assertAt",
+    "assertAfterNStepWhen",
+    "assertNextStepWhen",
+    "assertAlwaysAfterNStepWhen",
+    "past",
+    "astLivenessDefault",
+    "astLivenessBounded",
+    "astRelaxedLiveness",
+    "assertLivenessTimer"
+  )
+
+  private def countOccurrences(text: String, needle: String): Int = {
+    Pattern.compile(Pattern.quote(needle)).matcher(text).results().count().toInt
+  }
+
+  @nowarn("cat=deprecation")
+  private def emitVerilog(): String = {
+    (new ChiselStage).emitVerilog(
+      new FullTestDut,
+      Array("--target-dir", "verilog")
+    )
   }
 }
 

@@ -12,8 +12,7 @@ object root extends SbtModule { m =>
     "-language:reflectiveCalls",
     "-deprecation",
     "-feature",
-    "-Xcheckinit",
-    "-P:chiselplugin:genBundleElements"
+    "-Xcheckinit"
   )
   override def ivyDeps = Agg(
     ivy"edu.berkeley.cs::chisel3:3.6.0",
@@ -21,7 +20,7 @@ object root extends SbtModule { m =>
   override def scalacPluginIvyDeps = Agg(
     ivy"edu.berkeley.cs:::chisel3-plugin:3.6.0",
   )
-  object test extends Tests with ScalaTest {
+  object test extends SbtModuleTests with ScalaTest {
     override def ivyDeps = m.ivyDeps() ++ Agg(
       ivy"org.scalatest::scalatest:3.2.18"
     )

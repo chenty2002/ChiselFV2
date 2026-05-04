@@ -340,6 +340,7 @@ project/plugins/project/
 hs_err_pid*
 
 /project/
+/verilog/
 *_prove
 *_build
 *_abcPdr

@@ -172,8 +172,8 @@ object Check {
 
   private def processResultHandler(process: Process, name: String, dir: String): Unit = {
 
-    val output = Source.fromInputStream(process.getInputStream).getLines.mkString("\n")
-    val error = Source.fromInputStream(process.getErrorStream).getLines.mkString("\n")
+    val output = Source.fromInputStream(process.getInputStream).getLines().mkString("\n")
+    val error = Source.fromInputStream(process.getErrorStream).getLines().mkString("\n")
 
     if (error != "") {
       println("Error: " + error)
