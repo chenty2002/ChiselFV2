@@ -5,14 +5,45 @@ import circt.stage.ChiselStage
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
+import java.util.regex.Pattern
+
 class FullTest extends AnyFlatSpec with Matchers {
   behavior of "Formal"
 
-  it should "elaborate every public assertion helper" in {
+  it should "emit and verify every public assertion helper" in {
     val sv = ChiselStage.emitSystemVerilog(new FullTestDut)
+    val out = Path.of("verilog", "FullTestDut.sv")
+    Files.createDirectories(out.getParent)
+    Files.writeString(out, sv, StandardCharsets.UTF_8)
 
     sv should include("module FullTestDut")
-    sv should include("assert")
+    assertionLabels.foreach { label =>
+      sv should include(s"$label:")
+    }
+    sv should include("disable iff (~hasBeenReset)")
+    sv should include("< 7'h41")
+    sv should include("< 3'h5")
+    countOccurrences(sv, "assert property") shouldBe assertionLabels.size
+    countOccurrences(sv, "assert(") shouldBe 0
+  }
+
+  private val assertionLabels = Seq(
+    "fvAssert",
+    "assertAt",
+    "assertAfterNStepWhen",
+    "assertNextStepWhen",
+    "assertAlwaysAfterNStepWhen",
+    "past",
+    "astLivenessDefault",
+    "astLivenessBounded",
+    "astRelaxedLiveness",
+    "assertLivenessTimer"
+  )
+
+  private def countOccurrences(text: String, needle: String): Int = {
+    Pattern.compile(Pattern.quote(needle)).matcher(text).results().count().toInt
   }
 }
 
