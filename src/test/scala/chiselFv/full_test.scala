@@ -1,34 +1,49 @@
 package chiselFv
 
 import chisel3._
-import chisel3.stage.ChiselStage
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Path}
 import java.util.regex.Pattern
-import scala.annotation.nowarn
 
 class FullTest extends AnyFlatSpec with Matchers {
   behavior of "Formal"
 
   it should "emit and verify every public assertion helper" in {
     val sv = emitVerilog()
-    val out = Path.of("verilog", "FullTestDut.v")
-    Files.createDirectories(out.getParent)
-    Files.writeString(out, sv, StandardCharsets.UTF_8)
+    writeVerilog("FullTestDut.sv", sv)
+    writeVerilog("FullTestDut.v", sv)
 
     sv should include("module FullTestDut")
     assertionMessages.foreach { message =>
       sv should include(s"Assertion failed: $message")
+      assertionSignal(sv, message) should not be empty
     }
-    sv should include("nextTimer <= 7'h40")
-    sv should include("nextTimer_1 <= 3'h4")
-    sv should include("nextTimer_2 <= 3'h4")
-    sv should include("nextTimer_3 <= 3'h4")
-    countOccurrences(sv, "$fatal") shouldBe assertionMessages.size
-    countOccurrences(sv, "assert property") shouldBe 0
+
+    assertionDefinition(sv, "fvAssert") should include("validData")
+    assertionDefinition(sv, "fvAssert") should include("resetCounter_notChaos")
+    assertionDefinition(sv, "assertAt") should include("timeSinceReset")
+    assertionDefinition(sv, "assertAt") should include("32'h1")
+    assertionDefinition(sv, "assertAfterNStepWhen") should include("pipe")
+    assertionDefinition(sv, "assertNextStepWhen") should include("pipe_1")
+    assertionDefinition(sv, "assertAlwaysAfterNStepWhen") should include("pipe_2")
+    assertionDefinition(sv, "past") should include("enable")
+    sv should include("wire        enable = _resetCounter_notChaos & (|_resetCounter_timeSinceReset)")
+    assertionDefinition(sv, "past") should include("prevData")
+    assertionDefinition(sv, "astLivenessDefault") should include("nextPending")
+    assertionDefinition(sv, "astLivenessDefault") should include("7'h41")
+    assertionDefinition(sv, "astLivenessBounded") should include("nextPending_1")
+    assertionDefinition(sv, "astLivenessBounded") should include("3'h5")
+    assertionDefinition(sv, "astRelaxedLiveness") should include("nextPending_2")
+    assertionDefinition(sv, "astRelaxedLiveness") should include("3'h5")
+    assertionDefinition(sv, "assertLivenessTimer") should include("timer_3")
+    assertionDefinition(sv, "assertLivenessTimer") should include("3'h5")
+
+    countOccurrences(sv, "assert property") shouldBe assertionMessages.size
+    countOccurrences(sv, "$fatal") shouldBe 0
+    countOccurrences(sv, "$fwrite") shouldBe 0
   }
 
   private val assertionMessages = Seq(
@@ -48,11 +63,32 @@ class FullTest extends AnyFlatSpec with Matchers {
     Pattern.compile(Pattern.quote(needle)).matcher(text).results().count().toInt
   }
 
-  @nowarn("cat=deprecation")
+  private def writeVerilog(filename: String, sv: String): Unit = {
+    val out = Path.of("verilog", filename)
+    Files.createDirectories(out.getParent)
+    Files.writeString(out, sv, StandardCharsets.UTF_8)
+  }
+
+  private def assertionSignal(text: String, label: String): String = {
+    val pattern = Pattern.compile(
+      s"""(?s)assert property \\(@\\(posedge clock\\) ([^\\)]+)\\)\\s*else\\s+\\S+\\("Assertion failed: \\Q$label\\E"""
+    )
+    val matcher = pattern.matcher(text)
+    if (matcher.find()) matcher.group(1) else ""
+  }
+
+  private def assertionDefinition(text: String, label: String): String = {
+    val signal = assertionSignal(text, label)
+    val pattern = Pattern.compile(s"(?s)wire\\s+\\Q$signal\\E\\s*=\\s*(.*?);")
+    val matcher = pattern.matcher(text)
+    if (matcher.find()) matcher.group(1) else ""
+  }
+
   private def emitVerilog(): String = {
-    (new ChiselStage).emitVerilog(
+    circt.stage.ChiselStage.emitSystemVerilog(
       new FullTestDut,
-      Array("--target-dir", "verilog")
+      Array("--target-dir", "verilog"),
+      Array("--emit-chisel-asserts-as-sva")
     )
   }
 }

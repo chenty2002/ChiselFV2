@@ -16,6 +16,7 @@ trait Formal {
   val notChaos = resetCounter.io.notChaos
 
   private val DefaultLivenessBound = 64
+  private var assertEnable: Bool = true.B
 
   private def requireNonNegative(value: Int, name: String): Unit = {
     require(value >= 0, s"$name must be non-negative")
@@ -68,23 +69,34 @@ trait Formal {
     fvAssert(!nextPending || nextTimer <= n.U, msg)
   }
 
+  private def withAssertEnable(enable: Bool)(block: => Unit): Unit = {
+    val parent = assertEnable
+    assertEnable = parent && enable
+    try {
+      block
+    } finally {
+      assertEnable = parent
+    }
+  }
+
+  private def emitAssert(enable: Bool, cond: Bool, msg: String)
+                        (implicit sourceInfo: SourceInfo): Unit = {
+    assert(!enable || cond, msg)
+  }
+
   def fvAssert(cond: Bool, msg: String = "")
               (implicit sourceInfo: SourceInfo): Unit = {
-    when(notChaos) {
-      assert(cond, msg)
-    }
+    emitAssert(assertEnable && notChaos, cond, msg)
   }
 
   def assertAt(n: UInt, cond: Bool, msg: String = "")
               (implicit sourceInfo: SourceInfo): Unit = {
-    when(notChaos && timeSinceReset === n) {
-      assert(cond, msg)
-    }
+    emitAssert(assertEnable && notChaos && timeSinceReset === n, cond, msg)
   }
 
   def assertAfterNStepWhen(cond: Bool, n: Int, asert: Bool, msg: String = "")
                           (implicit sourceInfo: SourceInfo): Unit = {
-    when(delayedBool(cond && notChaos, n, sticky = false)) {
+    withAssertEnable(delayedBool(cond && notChaos, n, sticky = false)) {
       fvAssert(asert, msg)
     }
   }
@@ -96,7 +108,7 @@ trait Formal {
 
   def assertAlwaysAfterNStepWhen(cond: Bool, n: Int, asert: Bool, msg: String = "")
                                 (implicit sourceInfo: SourceInfo): Unit = {
-    when(delayedBool(cond && notChaos, n, sticky = true)) {
+    withAssertEnable(delayedBool(cond && notChaos, n, sticky = true)) {
       fvAssert(asert, msg)
     }
   }
@@ -105,8 +117,11 @@ trait Formal {
                      (implicit sourceInfo: SourceInfo): Unit = {
     requireNonNegative(n, "n")
 
-    when(notChaos && timeSinceReset >= n.U) {
-      block(Delay(value, n))
+    val enable = notChaos && timeSinceReset >= n.U
+    withAssertEnable(enable) {
+      when(enable) {
+        block(Delay(value, n))
+      }
     }
   }
 
