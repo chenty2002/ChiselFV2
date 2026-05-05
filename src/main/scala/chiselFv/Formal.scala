@@ -4,6 +4,7 @@ import chisel3.experimental.SourceInfo
 import chisel3._
 import chisel3.ltl.AssertProperty
 import chisel3.util.Cat
+import chisel3.util.PopCount
 import chisel3.util.log2Ceil
 
 
@@ -154,5 +155,72 @@ trait Formal {
 
     timer := nextTimer
     fvAssert(nextTimer <= n.U, msg)
+  }
+
+  def assertMutex(conds: Seq[Bool], msg: String = "")
+                 (implicit sourceInfo: SourceInfo): Unit = {
+    val atMostOne = if (conds.lengthCompare(2) < 0) {
+      true.B
+    } else {
+      PopCount(conds) <= 1.U
+    }
+
+    fvAssert(atMostOne, msg)
+  }
+
+  def assertOneHot(signal: UInt, msg: String = "")
+                  (implicit sourceInfo: SourceInfo): Unit = {
+    fvAssert(PopCount(signal) === 1.U, msg)
+  }
+
+  def assertOneHot0(signal: UInt, msg: String = "")
+                   (implicit sourceInfo: SourceInfo): Unit = {
+    fvAssert(PopCount(signal) <= 1.U, msg)
+  }
+
+  def assertStable[T <: Data](signal: T, msg: String = "")
+                             (implicit sourceInfo: SourceInfo): Unit = {
+    past(signal, 1) { previous =>
+      fvAssert(signal === previous, msg)
+    }
+  }
+
+  def assertStableWhen[T <: Data](en: Bool, signal: T, msg: String = "")
+                                 (implicit sourceInfo: SourceInfo): Unit = {
+    past(signal, 1) { previous =>
+      fvAssert(!en || signal === previous, msg)
+    }
+  }
+
+  def assertOnRise(signal: Bool, cond: Bool, msg: String = "")
+                  (implicit sourceInfo: SourceInfo): Unit = {
+    past(signal, 1) { previous =>
+      fvAssert(!(signal && !previous) || cond, msg)
+    }
+  }
+
+  def assertOnFall(signal: Bool, cond: Bool, msg: String = "")
+                  (implicit sourceInfo: SourceInfo): Unit = {
+    past(signal, 1) { previous =>
+      fvAssert(!(!signal && previous) || cond, msg)
+    }
+  }
+
+  def assertImplies(antecedent: Bool, consequent: Bool, msg: String = "")
+                   (implicit sourceInfo: SourceInfo): Unit = {
+    fvAssert(!antecedent || consequent, msg)
+  }
+
+  def assertImpliesDelay(antecedent: Bool, consequent: Bool, n: Int, msg: String = "")
+                        (implicit sourceInfo: SourceInfo): Unit = {
+    requireNonNegative(n, "n")
+
+    if (n == 0) {
+      assertImplies(antecedent, consequent, msg)
+    } else {
+      when(delayedBool(antecedent && notChaos, n, sticky = false)) {
+        fvAssert(consequent, msg)
+      }
+    }
   }
 }
